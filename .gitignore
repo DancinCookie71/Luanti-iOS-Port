@@ -1,0 +1,9 @@
+# Build artifacts
+/work/
+*.ipa
+*.app/
+build/
+build-*/
+
+# macOS
+.DS_Store

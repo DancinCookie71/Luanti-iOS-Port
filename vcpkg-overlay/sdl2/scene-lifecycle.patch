@@ -1,0 +1,131 @@
+--- a/src/video/uikit/SDL_uikitappdelegate.m	2026-09-12 08:00:06
++++ b/src/video/uikit/SDL_uikitappdelegate.m	2026-09-12 14:24:05
+@@ -346,8 +346,62 @@
+     return UIInterfaceOrientationMaskAll;
+ }
+ #endif /* !TARGET_OS_TV */
++
++@end
++
++#if !TARGET_OS_TV
++/* UIScene life cycle adoption is mandatory on modern iOS (iOS 26+ logs a
++ * warning, iOS 27 traps if the app does not adopt it). SDL2 does not support
++ * scenes upstream, so we add a minimal scene delegate here, modeled on the
++ * SDL3 implementation. */
++@interface SDLUIKitSceneDelegate : UIResponder <UIWindowSceneDelegate>
++@end
++
++@implementation SDLUIKitSceneDelegate
++
+++ (NSString *)getSceneDelegateClassName
++{
++    return @"SDLUIKitSceneDelegate";
++}
++
++- (void)scene:(UIScene *)scene willConnectToSession:(UISceneSession *)session options:(UISceneConnectionOptions *)connectionOptions
++{
++    if (![scene isKindOfClass:[UIWindowScene class]]) {
++        return;
++    }
++    UIWindowScene *windowScene = (UIWindowScene *)scene;
++    windowScene.delegate = self;
++}
++
++/* Keep the SDL window(s) filling the scene when the coordinate space changes
++ * (e.g. device rotation). Without this the window can stay at its initial
++ * size and only cover part of the screen. */
++- (void)windowScene:(UIWindowScene *)windowScene
++    didUpdateCoordinateSpace:(id<UICoordinateSpace>)previousCoordinateSpace
++    interfaceOrientation:(UIInterfaceOrientation)previousInterfaceOrientation
++    traitCollection:(UITraitCollection *)previousTraitCollection
++{
++    for (UIWindow *window in [UIApplication sharedApplication].windows) {
++        if (window.windowScene == windowScene) {
++            window.frame = windowScene.coordinateSpace.bounds;
++        }
++    }
++}
+ 
++- (void)sceneDidBecomeActive:(UIScene *)scene
++{ /* nothing; UIApplicationDelegate callbacks still fire */ }
++
++- (void)sceneWillResignActive:(UIScene *)scene
++{ /* nothing */ }
++
++- (void)sceneWillEnterForeground:(UIScene *)scene
++{ /* nothing */ }
++
++- (void)sceneDidEnterBackground:(UIScene *)scene
++{ /* nothing */ }
++
+ @end
++#endif /* !TARGET_OS_TV */
+ 
+ @implementation SDLUIKitDelegate {
+     UIWindow *launchWindow;
+@@ -475,6 +529,18 @@
+     return YES;
+ }
+ 
++#if !TARGET_OS_TV
++- (UISceneConfiguration *)application:(UIApplication *)application
++    configurationForConnectingSceneSession:(UISceneSession *)connectingSceneSession
++    options:(UISceneConnectionOptions *)options
++{
++    UISceneConfiguration *config = [[UISceneConfiguration alloc] initWithName:@"SDLSceneConfiguration"
++                                                                   sessionRole:connectingSceneSession.role];
++    config.delegateClass = [SDLUIKitSceneDelegate class];
++    return config;
++}
++#endif /* !TARGET_OS_TV */
++
+ - (UIWindow *)window
+ {
+     SDL_VideoDevice *_this = SDL_GetVideoDevice();
+--- a/src/video/uikit/SDL_uikitwindow.m	2026-09-12 08:00:06
++++ b/src/video/uikit/SDL_uikitwindow.m	2026-09-12 08:34:16
+@@ -42,6 +42,20 @@
+ 
+ #include <Foundation/Foundation.h>
+ 
++#if !TARGET_OS_TV
++static UIWindowScene *UIKit_GetActiveWindowScene(void)
++{
++    if (@available(iOS 13.0, *)) {
++        for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
++            if ([scene isKindOfClass:[UIWindowScene class]]) {
++                return (UIWindowScene *)scene;
++            }
++        }
++    }
++    return nil;
++}
++#endif /* !TARGET_OS_TV */
++
+ @implementation SDL_WindowData
+ 
+ @synthesize uiwindow;
+@@ -207,7 +221,22 @@
+ 
+         /* ignore the size user requested, and make a fullscreen window */
+         /* !!! FIXME: can we have a smaller view? */
+-        uiwindow = [[SDL_uikitwindow alloc] initWithFrame:data.uiscreen.bounds];
++        uiwindow = nil;
++#if !TARGET_OS_TV
++        if (@available(iOS 13.0, *)) {
++            /* Attach the window to a UIWindowScene when in scene mode.
++             * initWithWindowScene: leaves the frame at zero, so set it to
++             * the scene's bounds or the window will never be visible. */
++            UIWindowScene *scene = UIKit_GetActiveWindowScene();
++            if (scene) {
++                uiwindow = [[SDL_uikitwindow alloc] initWithWindowScene:scene];
++                uiwindow.frame = scene.coordinateSpace.bounds;
++            }
++        }
++#endif
++        if (uiwindow == nil) {
++            uiwindow = [[SDL_uikitwindow alloc] initWithFrame:data.uiscreen.bounds];
++        }
+ 
+         /* put the window on an external display if appropriate. */
+         if (data.uiscreen != [UIScreen mainScreen]) {
