@@ -23,7 +23,7 @@ packaged as an **unsigned `.ipa`** you can sign yourself and sideload.
 - Touch controls are not yet tuned for iOS
 - Keyboard can slightly nudge the view on some screens
 - `gettext` (translations), LevelDB/Redis/PostgreSQL backends disabled
-- Sideloaded apps from a free Apple ID expire after 7 days (re-sign/reinstall)
+- Sideloaded apps from a free Apple ID expire after 7 days (re-sign/reinstall) [Apple Limitation - We can't and never will be able to fix this]
 
 ## Download
 
