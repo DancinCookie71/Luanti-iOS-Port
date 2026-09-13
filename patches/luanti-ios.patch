@@ -5817,9 +5817,18 @@ index ccc4452..3bce263 100644
  
  float RenderingEngine::getDisplayDensity()
 diff --git a/src/defaultsettings.cpp b/src/defaultsettings.cpp
-index 57fab16..7aa7185 100644
+index 57fab16..c785ebc 100644
 --- a/src/defaultsettings.cpp
 +++ b/src/defaultsettings.cpp
+@@ -20,7 +20,7 @@
+  */
+ static bool detect_touch()
+ {
+-#if defined(__ANDROID__)
++#if defined(__ANDROID__) || defined(__IPHONEOS__)
+ 	return true;
+ #elif defined(__linux__)
+ 	std::string chassis_type;
 @@ -553,6 +553,11 @@ void set_default_settings()
  	settings->setDefault("display_density_factor", "1");
  	settings->setDefault("dpi_change_notifier", "0");
