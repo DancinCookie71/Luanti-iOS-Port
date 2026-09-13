@@ -37,7 +37,7 @@ make -C "$SRC" TARGET_SYS=iOS BUILDMODE=static \
 rm -rf "$OUT"
 mkdir -p "$OUT/lib" "$OUT/include"
 cp "$SRC/src/libluajit.a" "$OUT/lib/"
-for h in lua.h luajit.h lauxlib.h lualib.h lua.hpp; do
+for h in lua.h luaconf.h luajit.h lauxlib.h lualib.h lua.hpp; do
 	[ -f "$SRC/src/$h" ] && cp "$SRC/src/$h" "$OUT/include/"
 done
 
