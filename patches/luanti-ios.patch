@@ -5154,7 +5154,7 @@ index fef8b1b..b27992e 100644
  	ScaleY = (float)drawable_h / (float)window_h;
  
 diff --git a/irr/src/CMakeLists.txt b/irr/src/CMakeLists.txt
-index e1759e3..6ac2939 100644
+index e1759e3..0bf57ad 100644
 --- a/irr/src/CMakeLists.txt
 +++ b/irr/src/CMakeLists.txt
 @@ -72,7 +72,12 @@ endif()
@@ -5190,6 +5190,21 @@ index e1759e3..6ac2939 100644
  else()
  	if(ANDROID OR EMSCRIPTEN)
  		set(DEFAULT_GLES2 TRUE)
+@@ -138,7 +151,13 @@ endif()
+ # Misc
+ 
+ include(TestBigEndian)
+-TEST_BIG_ENDIAN(BIG_ENDIAN)
++if(IOS)
++	# iOS is always little-endian on supported devices. TEST_BIG_ENDIAN's
++	# try-run can fail spuriously when cross-compiling / in CI, so skip it.
++	set(BIG_ENDIAN 0)
++else()
++	TEST_BIG_ENDIAN(BIG_ENDIAN)
++endif()
+ if(BIG_ENDIAN)
+ 	add_compile_definitions(__BIG_ENDIAN__)
+ endif()
 diff --git a/irr/src/COpenGLCoreTexture.h b/irr/src/COpenGLCoreTexture.h
 index a3a251c..57df341 100644
 --- a/irr/src/COpenGLCoreTexture.h
