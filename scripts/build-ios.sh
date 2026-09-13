@@ -21,9 +21,17 @@ BUILD="$WORK/build-$TRIPLET-$FLAVOR"
 OUT="${OUT:-$ROOT/luanti-ios-$FLAVOR.ipa}"
 
 case "$FLAVOR" in
-	lua|luajit) ;;
+	lua)
+		DISPLAY_NAME="${DISPLAY_NAME:-Luanti}"
+		DEFAULT_BUNDLE_ID="org.luanti.luanti"
+		;;
+	luajit)
+		DISPLAY_NAME="${DISPLAY_NAME:-Luanti JIT}"
+		DEFAULT_BUNDLE_ID="org.luanti.luanti.luajit"
+		;;
 	*) echo "error: FLAVOR must be 'lua' or 'luajit'" >&2; exit 1 ;;
 esac
+BUNDLE_ID="${BUNDLE_ID:-$DEFAULT_BUNDLE_ID}"
 
 mkdir -p "$WORK"
 
@@ -92,6 +100,14 @@ cmake -G Ninja -S "$WORK/luanti" -B "$BUILD" \
 	-DENABLE_SYSTEM_JSONCPP=FALSE -DENABLE_LTO=FALSE -DRUN_IN_PLACE=FALSE
 
 ninja -C "$BUILD"
+
+# --- Icon (optional; add icons/<flavor>.png to enable) -----------------------
+ICON="$ROOT/icons/$FLAVOR.png"
+if [ -f "$ICON" ]; then
+	"$ROOT/scripts/apply_icon.sh" "$BUILD/bin/luanti.app" "$ICON" "$DISPLAY_NAME" "$BUNDLE_ID"
+else
+	echo "No icon at icons/$FLAVOR.png; using default."
+fi
 
 # --- Package -----------------------------------------------------------------
 "$ROOT/scripts/make_ipa.sh" "$BUILD/bin/luanti.app" "$OUT"
