@@ -5817,7 +5817,7 @@ index ccc4452..3bce263 100644
  
  float RenderingEngine::getDisplayDensity()
 diff --git a/src/defaultsettings.cpp b/src/defaultsettings.cpp
-index 57fab16..c785ebc 100644
+index 57fab16..1a0a10e 100644
 --- a/src/defaultsettings.cpp
 +++ b/src/defaultsettings.cpp
 @@ -20,7 +20,7 @@
@@ -5858,10 +5858,20 @@ index 57fab16..c785ebc 100644
  	// Apply settings according to screen size
  	float x_inches = (float) porting::getDisplaySize().X /
  			(160.f * porting::getDisplayDensity());
-@@ -606,4 +612,5 @@ void set_default_settings()
+@@ -606,4 +612,15 @@ void set_default_settings()
  	}
  	// Tablets >= 6.0 use non-Android defaults for these settings
  #endif
++
++#if defined(__IPHONEOS__)
++	// iOS reports the Retina pixel ratio as the display density, so at
++	// gui_scaling 1.0 real-coordinate form specs (e.g. the settings dialog)
++	// end up wider than the screen. Scale the GUI/fonts down so common
++	// dialogs fit, mirroring what Android does for small screens.
++	settings->setDefault("gui_scaling", "0.75");
++	settings->setDefault("hud_scaling", "0.85");
++	settings->setDefault("display_density_factor", "0.75");
++#endif
 +#endif
  }
 diff --git a/src/gui/guiEngine.cpp b/src/gui/guiEngine.cpp
