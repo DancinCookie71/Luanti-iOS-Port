@@ -45,6 +45,12 @@ else
 fi
 
 # --- vcpkg -------------------------------------------------------------------
+# Use a persistent binary cache so restores don't collide with the clone.
+export VCPKG_BINARY_SOURCES="clear;files,$WORK/vcpkg-bincache,readwrite"
+
+if [ -d "$WORK/vcpkg" ] && [ ! -d "$WORK/vcpkg/.git" ]; then
+	rm -rf "$WORK/vcpkg"
+fi
 if [ ! -d "$WORK/vcpkg/.git" ]; then
 	git clone https://github.com/microsoft/vcpkg.git "$WORK/vcpkg"
 fi
