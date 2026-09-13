@@ -6327,6 +6327,40 @@ index 0000000..251fdfb
 +}
 +
 +} // namespace porting
+diff --git a/src/script/cpp_api/s_base.cpp b/src/script/cpp_api/s_base.cpp
+index 812d530..b2858b4 100644
+--- a/src/script/cpp_api/s_base.cpp
++++ b/src/script/cpp_api/s_base.cpp
+@@ -78,6 +78,29 @@ ScriptApiBase::ScriptApiBase(ScriptingType type):
+ 	else
+ 		luaL_openlibs(m_luastack);
+ 
++#if USE_LUAJIT
++	// Report whether the JIT compiler is actually active. On platforms where
++	// executable memory is unavailable (e.g. iOS) LuaJIT runs interpreted.
++	{
++		bool jit_on = false;
++		lua_getglobal(m_luastack, "jit");
++		if (lua_istable(m_luastack, -1)) {
++			lua_getfield(m_luastack, -1, "status");
++			if (lua_pcall(m_luastack, 0, 1, 0) == 0) {
++				jit_on = lua_toboolean(m_luastack, -1) != 0;
++				lua_pop(m_luastack, 1);
++			} else {
++				lua_pop(m_luastack, 1);
++			}
++			lua_pop(m_luastack, 1);
++		} else {
++			lua_pop(m_luastack, 1);
++		}
++		infostream << "LuaJIT: JIT compiler is "
++			<< (jit_on ? "enabled" : "unavailable (running interpreted)") << std::endl;
++	}
++#endif
++
+ 	// Load bit library
+ 	lua_pushcfunction(m_luastack, luaopen_bit);
+ 	lua_pushstring(m_luastack, LUA_BITLIBNAME);
 diff --git a/util/ios/install_resources.cmake b/util/ios/install_resources.cmake
 new file mode 100644
 index 0000000..750c4a3

@@ -15,11 +15,37 @@ packaged as an **unsigned `.ipa`** you can sign yourself and sideload.
 - Native text-input dialog for menu fields and chat (like Android)
 - Joins and plays on servers
 
+## Two builds: `lua` and `luajit`
+
+**There are TWO different types of `.ipa`** available. They are identical except
+for the Lua engine embedded in the client:
+
+| | `luanti-ios-lua.ipa` | `luanti-ios-luajit.ipa` |
+|---|---|---|
+| Lua engine | bundled PUC Lua 5.1 | LuaJIT 2.1 |
+| Compatibility | runs everywhere | runs everywhere |
+| Speed | baseline | usually **~2–4× faster** Lua |
+| Best for | simplest / maximum compatibility | heavier mods and games |
+
+- **Use `lua`** if you just want it to work — it runs fine, but may be slower
+  with heavier mods (lots of Lua per tick).
+- **Use `luajit`** if you play Lua-heavy games/mods. Despite the name it does
+  **not** require anything special on iOS — it uses LuaJIT's **interpreter**.
+
+> **About "JIT":** LuaJIT's *tracing JIT compiler* needs writable **and**
+> executable memory, which iOS forbids for normal apps. Upstream LuaJIT
+> therefore hard-disables the JIT on iOS (`LJ_OS_NOJIT`), so the `luajit` build
+> here is LuaJIT's (still quite fast) interpreter, **not** the JIT. Getting the
+> real JIT would require a patched LuaJIT plus a JIT-enabled launch (a JIT
+> enabler such as StikDebug/JITStreamer, or a jailbreak) — that is experimental
+> and is not shipped here. The client logs which mode it ended up in at startup:
+> `LuaJIT: JIT compiler is enabled / unavailable (running interpreted)`.
+
 ## Known limitations
 
 - **No sound** (OpenAL is not built yet)
-- **No LuaJIT** — bundled Lua 5.1 interpreter (iOS forbids JIT), so Lua-heavy
-  games are slower
+- **No tracing JIT** — the `luajit` build uses LuaJIT's interpreter (see above);
+  Lua-heavy games are still slower than on desktop
 - Touch controls are not yet tuned for iOS
 - Keyboard can slightly nudge the view on some screens
 - `gettext` (translations), LevelDB/Redis/PostgreSQL backends disabled
@@ -27,9 +53,10 @@ packaged as an **unsigned `.ipa`** you can sign yourself and sideload.
 
 ## Download
 
-Grab the latest `luanti-ios-unsigned.ipa` from the **Actions** tab (the
-`luanti-ios-unsigned` artifact of the newest successful run), or from the
-Releases page if one exists.
+Grab either build from the **Actions** tab of the newest successful run:
+
+- `luanti-ios-lua` — bundled Lua 5.1
+- `luanti-ios-luajit` — LuaJIT
 
 ## Installing (no Apple account needed to *build*)
 
@@ -48,33 +75,35 @@ Requirements: macOS with Xcode (and the iOS SDK), `cmake`, `ninja`,
 `pkg-config`, `git`, and network access.
 
 ```sh
-./scripts/build-ios.sh
-# -> luanti-ios-unsigned.ipa
+FLAVOR=lua    ./scripts/build-ios.sh   # -> luanti-ios-lua.ipa
+FLAVOR=luajit ./scripts/build-ios.sh   # -> luanti-ios-luajit.ipa
 ```
 
 The script clones Luanti at the pinned tag, applies `patches/luanti-ios.patch`,
 builds the iOS dependencies with vcpkg (using the SDL2 overlay in
 `vcpkg-overlay/`), configures CMake for `arm64-ios`, builds, and packages the
-`.ipa`.
+`.ipa`. For `FLAVOR=luajit` it additionally builds LuaJIT for iOS
+(`scripts/build-luajit-ios.sh`) and links it in.
 
-The included [GitHub Actions workflow](.github/workflows/build-ios.yml) does the
-same on every push and uploads the `.ipa` as an artifact.
+The included [GitHub Actions workflow](.github/workflows/build-ios.yml) builds
+**both** flavors on every push and uploads both `.ipa`s as artifacts.
 
-To target the Simulator instead:
+To target the Simulator instead (bundled-Lua flavor):
 
 ```sh
-TRIPLET=arm64-ios-simulator SYSROOT=iphonesimulator ./scripts/build-ios.sh
+TRIPLET=arm64-ios-simulator SYSROOT=iphonesimulator FLAVOR=lua ./scripts/build-ios.sh
 ```
 
 ## Repository layout
 
 ```
-patches/luanti-ios.patch   # all engine/iOS changes (applies to luanti 5.17.0)
-vcpkg-overlay/sdl2/        # patched SDL2 (UIScene lifecycle for iOS 26/27)
-scripts/build-ios.sh       # end-to-end build
-scripts/make_ipa.sh        # .app -> unsigned .ipa
-scripts/gen_ios_gl_compat.sh  # regenerates the GL enum header
-.github/workflows/         # CI
+patches/luanti-ios.patch       # all engine/iOS changes (applies to luanti 5.17.0)
+vcpkg-overlay/sdl2/            # patched SDL2 (UIScene lifecycle for iOS 26/27)
+scripts/build-ios.sh           # end-to-end build (FLAVOR=lua|luajit)
+scripts/build-luajit-ios.sh    # builds LuaJIT for iOS
+scripts/make_ipa.sh            # .app -> unsigned .ipa
+scripts/gen_ios_gl_compat.sh   # regenerates the GL enum header
+.github/workflows/             # CI (both flavors)
 ```
 
 ## Notable technical fixes

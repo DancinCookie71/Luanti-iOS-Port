@@ -3,20 +3,27 @@
 # Builds an unsigned Luanti iOS .ipa (device, arm64).
 # Requires: Xcode (with an iOS SDK), cmake, ninja, pkg-config, git.
 #
-# Usage:  ./scripts/build-ios.sh
-# Env:    LUANTI_TAG, VCPKG_COMMIT, TRIPLET, WORK, OUT
+# Usage:  FLAVOR=lua    ./scripts/build-ios.sh   # bundled PUC Lua 5.1
+#         FLAVOR=luajit ./scripts/build-ios.sh   # LuaJIT (interpreter on iOS)
+# Env:    FLAVOR, LUANTI_TAG, VCPKG_COMMIT, TRIPLET, SYSROOT, WORK, OUT
 #
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
+FLAVOR="${FLAVOR:-lua}"
 LUANTI_TAG="${LUANTI_TAG:-5.17.0}"
 VCPKG_COMMIT="${VCPKG_COMMIT:-a1cae005c39be7b18ba319fced856b68d7276271}"
 TRIPLET="${TRIPLET:-arm64-ios}"
 SYSROOT="${SYSROOT:-iphoneos}"
 WORK="${WORK:-$ROOT/work}"
-BUILD="$WORK/build-$TRIPLET"
-OUT="${OUT:-$ROOT/luanti-ios-unsigned.ipa}"
+BUILD="$WORK/build-$TRIPLET-$FLAVOR"
+OUT="${OUT:-$ROOT/luanti-ios-$FLAVOR.ipa}"
+
+case "$FLAVOR" in
+	lua|luajit) ;;
+	*) echo "error: FLAVOR must be 'lua' or 'luajit'" >&2; exit 1 ;;
+esac
 
 mkdir -p "$WORK"
 
@@ -49,6 +56,16 @@ git -C "$WORK/vcpkg" checkout -q "$VCPKG_COMMIT"
 	--triplet "$TRIPLET" \
 	--overlay-ports="$ROOT/vcpkg-overlay"
 
+# --- Lua backend -------------------------------------------------------------
+LUA_ARGS=()
+if [ "$FLAVOR" = "luajit" ]; then
+	LUAJIT_OUT="$WORK/luajit-ios" "$ROOT/scripts/build-luajit-ios.sh"
+	LUA_ARGS=(
+		-DLUA_INCLUDE_DIR="$WORK/luajit-ios/include"
+		-DLUA_LIBRARY="$WORK/luajit-ios/lib/libluajit.a"
+	)
+fi
+
 # --- Configure & build -------------------------------------------------------
 cmake -G Ninja -S "$WORK/luanti" -B "$BUILD" \
 	-DCMAKE_BUILD_TYPE=Release \
@@ -59,6 +76,7 @@ cmake -G Ninja -S "$WORK/luanti" -B "$BUILD" \
 	-DCMAKE_TOOLCHAIN_FILE="$WORK/vcpkg/scripts/buildsystems/vcpkg.cmake" \
 	-DVCPKG_TARGET_TRIPLET="$TRIPLET" \
 	-DVCPKG_MANIFEST_MODE=OFF \
+	"${LUA_ARGS[@]}" \
 	-DBUILD_CLIENT=TRUE -DBUILD_SERVER=FALSE \
 	-DBUILD_UNITTESTS=FALSE -DBUILD_BENCHMARKS=FALSE -DBUILD_DOCUMENTATION=FALSE \
 	-DENABLE_GETTEXT=FALSE -DENABLE_CURL=TRUE -DENABLE_SOUND=FALSE \

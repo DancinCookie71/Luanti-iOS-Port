@@ -8,7 +8,11 @@ on:
 jobs:
   build:
     runs-on: macos-15
-    timeout-minutes: 90
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        flavor: [lua, luajit]
 
     steps:
       - uses: actions/checkout@v4
@@ -31,12 +35,12 @@ jobs:
             work/vcpkg/packages
           key: vcpkg-${{ runner.os }}-arm64-ios-${{ hashFiles('vcpkg-overlay/sdl2/vcpkg.json', 'vcpkg-overlay/sdl2/scene-lifecycle.patch') }}
 
-      - name: Build
-        run: ./scripts/build-ios.sh
+      - name: Build (${{ matrix.flavor }})
+        run: FLAVOR=${{ matrix.flavor }} ./scripts/build-ios.sh
 
-      - name: Upload unsigned .ipa
+      - name: Upload ${{ matrix.flavor }} .ipa
         uses: actions/upload-artifact@v4
         with:
-          name: luanti-ios-unsigned
-          path: luanti-ios-unsigned.ipa
+          name: luanti-ios-${{ matrix.flavor }}
+          path: luanti-ios-${{ matrix.flavor }}.ipa
           if-no-files-found: error
