@@ -18,7 +18,7 @@ index 0ecd832..e469586 100644
  set(GCC_MINIMUM_VERSION "7.5")
 diff --git a/builtin/mainmenu/dlg_password_manager.lua b/builtin/mainmenu/dlg_password_manager.lua
 new file mode 100644
-index 0000000..b97acf7
+index 0000000..5c4ff24
 --- /dev/null
 +++ b/builtin/mainmenu/dlg_password_manager.lua
 @@ -0,0 +1,201 @@
@@ -35,9 +35,9 @@ index 0000000..b97acf7
 +			"formspec_version[4]",
 +			"size[8.5,5.2]",
 +			"label[0.5,0.5;", fgettext("Change master password"), "]",
-+			"pwdfield[0.5,1.1;7.5,0.8;pw_old;", fgettext("Current password"), ";]",
-+			"pwdfield[0.5,2.1;7.5,0.8;pw_new;", fgettext("New password"), ";]",
-+			"pwdfield[0.5,3.1;7.5,0.8;pw_new2;", fgettext("Confirm new password"), ";]",
++			"pwdfield[0.5,1.1;7.5,0.8;pw_old;", fgettext("Current password"), "]",
++			"pwdfield[0.5,2.1;7.5,0.8;pw_new;", fgettext("New password"), "]",
++			"pwdfield[0.5,3.1;7.5,0.8;pw_new2;", fgettext("Confirm new password"), "]",
 +		}
 +		if dialogdata.error then
 +			table.insert_all(retval, {
@@ -59,8 +59,8 @@ index 0000000..b97acf7
 +			"size[8.5,4.6]",
 +			"label[0.5,0.5;", fgettext("Set a master password"), "]",
 +			"label[0.5,0.9;", fgettext("Stored server passwords are encrypted with it."), "]",
-+			"pwdfield[0.5,1.4;7.5,0.8;pw_master;", fgettext("Master password"), ";]",
-+			"pwdfield[0.5,2.4;7.5,0.8;pw_master2;", fgettext("Confirm password"), ";]",
++			"pwdfield[0.5,1.4;7.5,0.8;pw_master;", fgettext("Master password"), "]",
++			"pwdfield[0.5,2.4;7.5,0.8;pw_master2;", fgettext("Confirm password"), "]",
 +		}
 +		if dialogdata.error then
 +			table.insert_all(retval, {
@@ -81,7 +81,7 @@ index 0000000..b97acf7
 +			"formspec_version[4]",
 +			"size[8.5,3.8]",
 +			"label[0.5,0.5;", fgettext("Enter your master password"), "]",
-+			"pwdfield[0.5,1.1;7.5,0.8;pw_master;", fgettext("Master password"), ";]",
++			"pwdfield[0.5,1.1;7.5,0.8;pw_master;", fgettext("Master password"), "]",
 +		}
 +		if dialogdata.error then
 +			table.insert_all(retval, {
