@@ -18,10 +18,10 @@ index 0ecd832..e469586 100644
  set(GCC_MINIMUM_VERSION "7.5")
 diff --git a/builtin/mainmenu/dlg_password_manager.lua b/builtin/mainmenu/dlg_password_manager.lua
 new file mode 100644
-index 0000000..6dae4b9
+index 0000000..b97acf7
 --- /dev/null
 +++ b/builtin/mainmenu/dlg_password_manager.lua
-@@ -0,0 +1,196 @@
+@@ -0,0 +1,201 @@
 +-- Luanti
 +-- SPDX-License-Identifier: LGPL-2.1-or-later
 +-- Password vault manager: set/unlock the master password and manage the
@@ -141,15 +141,18 @@ index 0000000..6dae4b9
 +
 +	if status == "unlocked" and this.data.mode == "change" then
 +		if fields.btn_change_confirm then
-+			if fields.pw_new == "" then
++			local pw_old = fields.pw_old or ""
++			local pw_new = fields.pw_new or ""
++			local pw_new2 = fields.pw_new2 or ""
++			if pw_new == "" then
 +				this.data.error = fgettext("Password cannot be empty")
 +				return true
 +			end
-+			if fields.pw_new ~= fields.pw_new2 then
++			if pw_new ~= pw_new2 then
 +				this.data.error = fgettext("Passwords do not match")
 +				return true
 +			end
-+			if not core.pwvault_change_master(fields.pw_old, fields.pw_new) then
++			if not core.pwvault_change_master(pw_old, pw_new) then
 +				this.data.error = fgettext("Wrong current password")
 +				return true
 +			end
@@ -160,15 +163,17 @@ index 0000000..6dae4b9
 +	end
 +
 +	if status == "none" and fields.btn_set then
-+		if fields.pw_master == "" then
++		local pw = fields.pw_master or ""
++		local pw2 = fields.pw_master2 or ""
++		if pw == "" then
 +			this.data.error = fgettext("Password cannot be empty")
 +			return true
 +		end
-+		if fields.pw_master ~= fields.pw_master2 then
++		if pw ~= pw2 then
 +			this.data.error = fgettext("Passwords do not match")
 +			return true
 +		end
-+		if not core.pwvault_set_master(fields.pw_master) then
++		if not core.pwvault_set_master(pw) then
 +			this.data.error = fgettext("Failed to set master password")
 +			return true
 +		end
@@ -176,7 +181,7 @@ index 0000000..6dae4b9
 +	end
 +
 +	if status == "locked" and fields.btn_unlock then
-+		if not core.pwvault_unlock(fields.pw_master) then
++		if not core.pwvault_unlock(fields.pw_master or "") then
 +			this.data.error = fgettext("Wrong master password")
 +			return true
 +		end
