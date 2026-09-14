@@ -16,6 +16,309 @@ index 0ecd832..e469586 100644
  set(CMAKE_CXX_STANDARD 17)
  set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
  set(GCC_MINIMUM_VERSION "7.5")
+diff --git a/builtin/mainmenu/dlg_password_manager.lua b/builtin/mainmenu/dlg_password_manager.lua
+new file mode 100644
+index 0000000..6dae4b9
+--- /dev/null
++++ b/builtin/mainmenu/dlg_password_manager.lua
+@@ -0,0 +1,196 @@
++-- Luanti
++-- SPDX-License-Identifier: LGPL-2.1-or-later
++-- Password vault manager: set/unlock the master password and manage the
++-- stored server passwords.
++
++local function pwvault_formspec(dialogdata)
++	local status = core.pwvault_status()
++
++	if status == "unlocked" and dialogdata.mode == "change" then
++		local retval = {
++			"formspec_version[4]",
++			"size[8.5,5.2]",
++			"label[0.5,0.5;", fgettext("Change master password"), "]",
++			"pwdfield[0.5,1.1;7.5,0.8;pw_old;", fgettext("Current password"), ";]",
++			"pwdfield[0.5,2.1;7.5,0.8;pw_new;", fgettext("New password"), ";]",
++			"pwdfield[0.5,3.1;7.5,0.8;pw_new2;", fgettext("Confirm new password"), ";]",
++		}
++		if dialogdata.error then
++			table.insert_all(retval, {
++				"label[0.5,4.0;", core.formspec_escape(dialogdata.error), "]",
++			})
++		end
++		table.insert_all(retval, {
++			"container[0.5,4.3]",
++			"button[0,0;3,0.8;btn_change_confirm;", fgettext("Change"), "]",
++			"button[5,0;3,0.8;btn_change_cancel;", fgettext("Cancel"), "]",
++			"container_end[]",
++		})
++		return table.concat(retval, "")
++	end
++
++	if status == "none" then
++		local retval = {
++			"formspec_version[4]",
++			"size[8.5,4.6]",
++			"label[0.5,0.5;", fgettext("Set a master password"), "]",
++			"label[0.5,0.9;", fgettext("Stored server passwords are encrypted with it."), "]",
++			"pwdfield[0.5,1.4;7.5,0.8;pw_master;", fgettext("Master password"), ";]",
++			"pwdfield[0.5,2.4;7.5,0.8;pw_master2;", fgettext("Confirm password"), ";]",
++		}
++		if dialogdata.error then
++			table.insert_all(retval, {
++				"label[0.5,3.2;", core.formspec_escape(dialogdata.error), "]",
++			})
++		end
++		table.insert_all(retval, {
++			"container[0.5,3.6]",
++			"button[0,0;2.5,0.8;btn_set;", fgettext("Set"), "]",
++			"button[5,0;3,0.8;btn_close;", fgettext("Cancel"), "]",
++			"container_end[]",
++		})
++		return table.concat(retval, "")
++	end
++
++	if status == "locked" then
++		local retval = {
++			"formspec_version[4]",
++			"size[8.5,3.8]",
++			"label[0.5,0.5;", fgettext("Enter your master password"), "]",
++			"pwdfield[0.5,1.1;7.5,0.8;pw_master;", fgettext("Master password"), ";]",
++		}
++		if dialogdata.error then
++			table.insert_all(retval, {
++				"label[0.5,2.0;", core.formspec_escape(dialogdata.error), "]",
++			})
++		end
++		table.insert_all(retval, {
++			"container[0.5,2.6]",
++			"button[0,0;2.5,0.8;btn_unlock;", fgettext("Unlock"), "]",
++			"button[5,0;3,0.8;btn_close;", fgettext("Cancel"), "]",
++			"container_end[]",
++		})
++		return table.concat(retval, "")
++	end
++
++	-- unlocked, normal view
++	local entries = core.pwvault_list() or {}
++	local rows = {}
++	for _, e in ipairs(entries) do
++		rows[#rows + 1] = core.formspec_escape(e.host) .. "," .. tostring(e.port)
++	end
++	local rowtext = table.concat(rows, ",")
++
++	return table.concat({
++		"formspec_version[4]",
++		"size[13,8]",
++		"label[0.5,0.5;", fgettext("Password vault (unlocked)"), "]",
++		"tablecolumns[text;text]",
++		"table[0.5,1;12,4.5;entries;", fgettext("Address"), ",", fgettext("Port"), ";",
++			rowtext, ";0]",
++		"container[0.5,5.9]",
++		"button[0,0;2.5,0.8;btn_remove;", fgettext("Remove"), "]",
++		"button[2.75,0;2.5,0.8;btn_clearall;", fgettext("Clear all"), "]",
++		"button[5.5,0;3,0.8;btn_lock;", fgettext("Lock"), "]",
++		"container_end[]",
++		"container[0.5,6.9]",
++		"button[0,0;3,0.8;btn_change;", fgettext("Change master password"), "]",
++		"button[9.5,0;3,0.8;btn_close;", fgettext("Close"), "]",
++		"container_end[]",
++	}, "")
++end
++
++local function pwvault_buttonhandler(this, fields)
++	this.data.error = nil
++	local status = core.pwvault_status()
++
++	if fields.btn_close or fields.btn_change_cancel then
++		if fields.btn_change_cancel then
++			this.data.mode = nil
++		end
++		if fields.btn_close then
++			this:delete()
++			return true
++		end
++		return true
++	end
++
++	if status == "unlocked" and this.data.mode == "change" then
++		if fields.btn_change_confirm then
++			if fields.pw_new == "" then
++				this.data.error = fgettext("Password cannot be empty")
++				return true
++			end
++			if fields.pw_new ~= fields.pw_new2 then
++				this.data.error = fgettext("Passwords do not match")
++				return true
++			end
++			if not core.pwvault_change_master(fields.pw_old, fields.pw_new) then
++				this.data.error = fgettext("Wrong current password")
++				return true
++			end
++			this.data.mode = nil
++			return true
++		end
++		return false
++	end
++
++	if status == "none" and fields.btn_set then
++		if fields.pw_master == "" then
++			this.data.error = fgettext("Password cannot be empty")
++			return true
++		end
++		if fields.pw_master ~= fields.pw_master2 then
++			this.data.error = fgettext("Passwords do not match")
++			return true
++		end
++		if not core.pwvault_set_master(fields.pw_master) then
++			this.data.error = fgettext("Failed to set master password")
++			return true
++		end
++		return true
++	end
++
++	if status == "locked" and fields.btn_unlock then
++		if not core.pwvault_unlock(fields.pw_master) then
++			this.data.error = fgettext("Wrong master password")
++			return true
++		end
++		return true
++	end
++
++	if status == "unlocked" then
++		if fields.btn_lock then
++			core.pwvault_lock()
++			return true
++		end
++		if fields.btn_change then
++			this.data.mode = "change"
++			return true
++		end
++		if fields.btn_clearall then
++			local entries = core.pwvault_list() or {}
++			for _, e in ipairs(entries) do
++				core.pwvault_remove(e.host, e.port)
++			end
++			return true
++		end
++		if fields.btn_remove then
++			local entries = core.pwvault_list() or {}
++			local idx = core.get_table_index("entries")
++			if idx and entries[idx] then
++				core.pwvault_remove(entries[idx].host, entries[idx].port)
++			end
++			return true
++		end
++	end
++
++	return false
++end
++
++function create_password_manager_dialog()
++	return dialog_create("dlg_password_manager",
++			pwvault_formspec,
++			pwvault_buttonhandler,
++			nil)
++end
+diff --git a/builtin/mainmenu/init.lua b/builtin/mainmenu/init.lua
+index eca3c40..a05ebe4 100644
+--- a/builtin/mainmenu/init.lua
++++ b/builtin/mainmenu/init.lua
+@@ -33,6 +33,7 @@ dofile(menupath .. DIR_DELIM .. "dlg_create_world.lua")
+ dofile(menupath .. DIR_DELIM .. "dlg_delete_content.lua")
+ dofile(menupath .. DIR_DELIM .. "dlg_delete_world.lua")
+ dofile(menupath .. DIR_DELIM .. "dlg_register.lua")
++dofile(menupath .. DIR_DELIM .. "dlg_password_manager.lua")
+ dofile(menupath .. DIR_DELIM .. "dlg_rename_modpack.lua")
+ dofile(menupath .. DIR_DELIM .. "dlg_version_info.lua")
+ dofile(menupath .. DIR_DELIM .. "dlg_reinstall_mtg.lua")
+diff --git a/builtin/mainmenu/tab_online.lua b/builtin/mainmenu/tab_online.lua
+index 675aa20..9438176 100644
+--- a/builtin/mainmenu/tab_online.lua
++++ b/builtin/mainmenu/tab_online.lua
+@@ -97,7 +97,7 @@ local function get_formspec(tabview, name, tabdata)
+ 
+ 	local retval =
+ 		-- Search
+-		"field[0.25,0.25;7,0.75;te_search;;" .. core.formspec_escape(tabdata.search_for) .. "]" ..
++		"field[0.25,0.25;5.5,0.75;te_search;;" .. core.formspec_escape(tabdata.search_for) .. "]" ..
+ 		"tooltip[te_search;" .. core.formspec_escape(table.concat({
+ 				fgettext("Possible filters"),
+ 				"game:<name>",
+@@ -106,7 +106,7 @@ local function get_formspec(tabview, name, tabdata)
+ 				"sort:[-](name|relevance|players|mods|uptime|ping|lag)",
+ 		}, "\n")) .. "]" ..
+ 		"field_enter_after_edit[te_search;true]" ..
+-		"container[7.25,0.25]" ..
++		"container[5.75,0.25]" ..
+ 		"image_button[0,0;0.75,0.75;" .. core.formspec_escape(defaulttexturedir .. "search.png") .. ";btn_mp_search;]" ..
+ 		"image_button[0.75,0;0.75,0.75;" .. core.formspec_escape(defaulttexturedir .. "clear.png") .. ";btn_mp_clear;]" ..
+ 		"image_button[1.5,0;0.75,0.75;" .. core.formspec_escape(defaulttexturedir .. "refresh.png") .. ";btn_mp_refresh;]" ..
+@@ -115,6 +115,7 @@ local function get_formspec(tabview, name, tabdata)
+ 		-- TRANSLATORS: As in 'reload'/'check again'
+ 		"tooltip[btn_mp_refresh;" .. fgettext("Refresh") .. "]" ..
+ 		"container_end[]" ..
++		"button[8.0,0.25;1.6,0.75;btn_pwvault;" .. fgettext("Vault") .. "]" ..
+ 
+ 		"container[9.75,0]" ..
+ 		"box[0,0;5.75,7.1;#666666]" ..
+@@ -496,6 +497,14 @@ local function search_server_list(input, tabdata)
+ end
+ 
+ local function main_button_handler(tabview, fields, name, tabdata)
++	if fields.btn_pwvault then
++		local dlg = create_password_manager_dialog()
++		dlg:set_parent(tabview)
++		tabview:hide()
++		dlg:show()
++		return true
++	end
++
+ 	if fields.te_name then
+ 		gamedata.playername = fields.te_name
+ 		core.settings:set("name", fields.te_name)
+@@ -518,9 +527,16 @@ local function main_button_handler(tabview, fields, name, tabdata)
+ 				gamedata.playername = fields.te_name
+ 				gamedata.selected_world = 0
+ 
+-				if fields.te_pwd then
+-					gamedata.password = fields.te_pwd
++				local pwd = fields.te_pwd or ""
++				if core.pwvault_status() == "unlocked" then
++					local saved_pwd = core.pwvault_get(server.address, server.port)
++					if pwd == "" and saved_pwd then
++						pwd = saved_pwd
++					elseif pwd ~= "" then
++						core.pwvault_put(server.address, server.port, pwd)
++					end
+ 				end
++				gamedata.password = pwd
+ 
+ 				if gamedata.address and gamedata.port then
+ 					set_selected_server(server)
+@@ -598,10 +614,23 @@ local function main_button_handler(tabview, fields, name, tabdata)
+ 	if (fields.btn_mp_login or fields.key_enter) and host_filled then
+ 		gamedata.mode       = "join"
+ 		gamedata.playername = fields.te_name
+-		gamedata.password   = fields.te_pwd
+ 		gamedata.address    = fields.te_address
+ 		gamedata.port       = te_port_number
+ 
++		-- password vault: auto-fill from stored password, or save a typed one
++		if core.pwvault_status() == "unlocked" then
++			local typed_pwd = fields.te_pwd or ""
++			local saved_pwd = core.pwvault_get(fields.te_address, te_port_number)
++			if typed_pwd == "" and saved_pwd then
++				typed_pwd = saved_pwd
++			elseif typed_pwd ~= "" then
++				core.pwvault_put(fields.te_address, te_port_number, typed_pwd)
++			end
++			gamedata.password = typed_pwd
++		else
++			gamedata.password = fields.te_pwd or ""
++		end
++
+ 		local enable_split_login_register = core.settings:get_bool("enable_split_login_register")
+ 		gamedata.allow_login_or_register = enable_split_login_register and "login" or "any"
+ 		gamedata.selected_world = 0
 diff --git a/irr/include/mt_ios_gl_compat.h b/irr/include/mt_ios_gl_compat.h
 new file mode 100644
 index 0000000..d686770
@@ -5667,6 +5970,18 @@ index 0d599fb..0691419 100644
  		${GMP_LIBRARY}
  		${PLATFORM_LIBS}
  	)
+diff --git a/src/client/CMakeLists.txt b/src/client/CMakeLists.txt
+index 2f68883..0f4f9a1 100644
+--- a/src/client/CMakeLists.txt
++++ b/src/client/CMakeLists.txt
+@@ -42,6 +42,7 @@ set(client_SRCS
+ 	${CMAKE_CURRENT_SOURCE_DIR}/client.cpp
+ 	${CMAKE_CURRENT_SOURCE_DIR}/clientenvironment.cpp
+ 	${CMAKE_CURRENT_SOURCE_DIR}/clientlauncher.cpp
++	${CMAKE_CURRENT_SOURCE_DIR}/password_vault.cpp
+ 	${CMAKE_CURRENT_SOURCE_DIR}/clientmap.cpp
+ 	${CMAKE_CURRENT_SOURCE_DIR}/clientmedia.cpp
+ 	${CMAKE_CURRENT_SOURCE_DIR}/clientobject.cpp
 diff --git a/src/client/game.cpp b/src/client/game.cpp
 index 8c5cc35..a88a75f 100644
 --- a/src/client/game.cpp
@@ -5789,6 +6104,545 @@ index 21efc02..e06dcf5 100644
  	bool m_android_chat_open;
  #endif
  
+diff --git a/src/client/password_vault.cpp b/src/client/password_vault.cpp
+new file mode 100644
+index 0000000..c226db3
+--- /dev/null
++++ b/src/client/password_vault.cpp
+@@ -0,0 +1,460 @@
++// Luanti
++// SPDX-License-Identifier: LGPL-2.1-or-later
++
++#include "password_vault.h"
++#include "config.h"
++#include "filesys.h"
++#include "log.h"
++#include "porting.h"
++
++#if USE_OPENSSL
++#include <openssl/evp.h>
++#include <openssl/hmac.h>
++#include <openssl/rand.h>
++#endif
++
++#include <algorithm>
++#include <cstdint>
++#include <cstdlib>
++#include <fstream>
++#include <sstream>
++
++namespace {
++
++constexpr int KDF_ITERATIONS = 200000;
++constexpr int SALT_LEN = 16;
++constexpr int KEY_LEN = 32;
++constexpr int NONCE_LEN = 12;
++constexpr int TAG_LEN = 16;
++constexpr const char *FILE_MAGIC = "LuantiPW1";
++
++std::string entryKey(const std::string &host, int port)
++{
++	return host + "\x1f" + std::to_string(port);
++}
++
++std::string entryKeyFor(const std::string &host, const std::string &port)
++{
++	return host + "\x1f" + port;
++}
++
++const char HEX[] = "0123456789abcdef";
++
++std::string toHex(const std::string &s)
++{
++	std::string out;
++	out.reserve(s.size() * 2);
++	for (unsigned char c : s) {
++		out += HEX[c >> 4];
++		out += HEX[c & 0xF];
++	}
++	return out;
++}
++
++bool fromHex(const std::string &s, std::string &out)
++{
++	if (s.size() % 2)
++		return false;
++	out.clear();
++	out.reserve(s.size() / 2);
++	auto nib = [](char c) -> int {
++		if (c >= '0' && c <= '9') return c - '0';
++		if (c >= 'a' && c <= 'f') return c - 'a' + 10;
++		if (c >= 'A' && c <= 'F') return c - 'A' + 10;
++		return -1;
++	};
++	for (size_t i = 0; i < s.size(); i += 2) {
++		int hi = nib(s[i]);
++		int lo = nib(s[i + 1]);
++		if (hi < 0 || lo < 0)
++			return false;
++		out += (char)((hi << 4) | lo);
++	}
++	return true;
++}
++
++std::string entriesToPlaintext(const std::map<std::string, std::string> &entries)
++{
++	std::string out = std::to_string(entries.size()) + "\n";
++	for (const auto &[key, password] : entries) {
++		// key is "host\x1fport"; split it back out.
++		auto sep = key.find('\x1f');
++		std::string host = key.substr(0, sep);
++		std::string port = key.substr(sep + 1);
++		out += toHex(host) + " " + port + " " + toHex(password) + "\n";
++	}
++	return out;
++}
++
++bool plaintextToEntries(const std::string &plaintext,
++		std::map<std::string, std::string> &entries)
++{
++	std::istringstream in(plaintext);
++	std::string line;
++	if (!std::getline(in, line))
++		return false;
++	char *end = nullptr;
++	long count = std::strtol(line.c_str(), &end, 10);
++	if (end == line.c_str() || count < 0)
++		return false;
++	entries.clear();
++	for (long i = 0; i < count; ++i) {
++		if (!std::getline(in, line))
++			return false;
++		std::istringstream ls(line);
++		std::string host_hex, port, password_hex;
++		if (!(ls >> host_hex >> port >> password_hex))
++			return false;
++		std::string host, password;
++		if (!fromHex(host_hex, host) || !fromHex(password_hex, password))
++			return false;
++		entries[entryKeyFor(host, port)] = password;
++	}
++	return true;
++}
++
++} // namespace
++
++// Re-exposed so the helper above can build entry keys.
++PasswordVault::PasswordVault()
++{
++	m_path = porting::path_user + DIR_DELIM + "password_vault";
++#if USE_OPENSSL
++	load();
++#endif
++}
++
++PasswordVault &PasswordVault::get()
++{
++	static PasswordVault vault;
++	return vault;
++}
++
++PasswordVault::Status PasswordVault::status() const
++{
++	if (!m_has_master)
++		return Status::None;
++	return m_unlocked ? Status::Unlocked : Status::Locked;
++}
++
++bool PasswordVault::deriveKey(const std::string &master, std::string &key_out) const
++{
++#if USE_OPENSSL
++	if (m_salt.empty())
++		return false;
++	key_out.assign(KEY_LEN, '\0');
++	return PKCS5_PBKDF2_HMAC(master.c_str(), (int)master.size(),
++			(const unsigned char *)m_salt.data(), (int)m_salt.size(),
++			m_iterations, EVP_sha256(), KEY_LEN,
++			(unsigned char *)key_out.data()) == 1;
++#else
++	return false;
++#endif
++}
++
++bool PasswordVault::load()
++{
++#if USE_OPENSSL
++	std::ifstream in(m_path, std::ios::binary);
++	if (!in)
++		return true; // no vault yet
++
++	std::string magic, salt_hex, iter_str, verifier_hex, blob_hex;
++	if (!std::getline(in, magic) || magic != FILE_MAGIC)
++		return true;
++	if (!std::getline(in, salt_hex) || !fromHex(salt_hex, m_salt))
++		return true;
++	if (!std::getline(in, iter_str))
++		return true;
++	m_iterations = std::atoi(iter_str.c_str());
++	if (m_iterations < 1)
++		return true;
++	if (!std::getline(in, verifier_hex) || !fromHex(verifier_hex, m_verifier))
++		return true;
++	if (!std::getline(in, blob_hex) || !fromHex(blob_hex, m_blob))
++		return true;
++
++	m_has_master = true;
++	return true;
++#else
++	return false;
++#endif
++}
++
++bool PasswordVault::save() const
++{
++#if USE_OPENSSL
++	std::string content = std::string(FILE_MAGIC) + "\n" + toHex(m_salt) + "\n" +
++			std::to_string(m_iterations) + "\n" + toHex(m_verifier) + "\n" +
++			toHex(m_blob) + "\n";
++	std::ofstream out(m_path, std::ios::binary | std::ios::trunc);
++	if (!out)
++		return false;
++	out << content;
++	return out.good();
++#else
++	return false;
++#endif
++}
++
++bool PasswordVault::setMasterPassword(const std::string &master)
++{
++#if USE_OPENSSL
++	if (m_has_master || master.empty())
++		return false;
++
++	m_salt.assign(SALT_LEN, '\0');
++	if (RAND_bytes((unsigned char *)m_salt.data(), SALT_LEN) != 1)
++		return false;
++	m_iterations = KDF_ITERATIONS;
++
++	if (!deriveKey(master, m_key))
++		return false;
++
++	// Verifier = HMAC-SHA256(key, magic), truncated.
++	unsigned char ver[EVP_MAX_MD_SIZE];
++	unsigned int verlen = 0;
++	if (!HMAC(EVP_sha256(), m_key.data(), m_key.size(),
++			(const unsigned char *)FILE_MAGIC, sizeof(FILE_MAGIC) - 1, ver, &verlen))
++		return false;
++	m_verifier.assign((const char *)ver, 16);
++
++	m_entries.clear();
++	m_has_master = true;
++	m_unlocked = true;
++
++	if (!encryptEntries() || !save())
++		return false;
++	return true;
++#else
++	return false;
++#endif
++}
++
++bool PasswordVault::changeMasterPassword(const std::string &old_master,
++		const std::string &new_master)
++{
++#if USE_OPENSSL
++	if (!m_has_master || new_master.empty())
++		return false;
++	if (m_unlocked) {
++		// We already have the key; re-derive from the new password.
++		std::string new_key;
++		std::string salt = m_salt;
++		// Keep the same salt; derive the new key from the new password.
++		m_salt.assign(SALT_LEN, '\0');
++		if (RAND_bytes((unsigned char *)m_salt.data(), SALT_LEN) != 1)
++			return false;
++		if (!deriveKey(new_master, new_key))
++			return false;
++		m_key = new_key;
++		unsigned char ver[EVP_MAX_MD_SIZE];
++		unsigned int verlen = 0;
++		if (!HMAC(EVP_sha256(), m_key.data(), m_key.size(),
++				(const unsigned char *)FILE_MAGIC, sizeof(FILE_MAGIC) - 1, ver, &verlen))
++			return false;
++		m_verifier.assign((const char *)ver, 16);
++		return encryptEntries() && save();
++	} else {
++		if (!unlock(old_master))
++			return false;
++		// Re-encrypt with the new key (same entries).
++		std::string new_key;
++		m_salt.assign(SALT_LEN, '\0');
++		if (RAND_bytes((unsigned char *)m_salt.data(), SALT_LEN) != 1)
++			return false;
++		if (!deriveKey(new_master, new_key))
++			return false;
++		m_key = new_key;
++		unsigned char ver[EVP_MAX_MD_SIZE];
++		unsigned int verlen = 0;
++		if (!HMAC(EVP_sha256(), m_key.data(), m_key.size(),
++				(const unsigned char *)FILE_MAGIC, sizeof(FILE_MAGIC) - 1, ver, &verlen))
++			return false;
++		m_verifier.assign((const char *)ver, 16);
++		return encryptEntries() && save();
++	}
++#else
++	return false;
++#endif
++}
++
++bool PasswordVault::removeMasterPassword(const std::string &master)
++{
++#if USE_OPENSSL
++	if (!m_has_master)
++		return false;
++	if (!m_unlocked && !unlock(master))
++		return false;
++	m_has_master = false;
++	m_unlocked = false;
++	m_entries.clear();
++	m_salt.clear();
++	m_verifier.clear();
++	m_blob.clear();
++	m_key.clear();
++	// Remove the file if it exists.
++	fs::DeleteSingleFileOrEmptyDirectory(m_path, true);
++	return true;
++#else
++	return false;
++#endif
++}
++
++bool PasswordVault::unlock(const std::string &master)
++{
++#if USE_OPENSSL
++	if (!m_has_master)
++		return false;
++	std::string key;
++	if (!deriveKey(master, key))
++		return false;
++	unsigned char ver[EVP_MAX_MD_SIZE];
++	unsigned int verlen = 0;
++	if (!HMAC(EVP_sha256(), key.data(), key.size(),
++			(const unsigned char *)FILE_MAGIC, sizeof(FILE_MAGIC) - 1, ver, &verlen))
++		return false;
++	if (m_verifier.size() != 16 ||
++			!std::equal(m_verifier.begin(), m_verifier.end(), ver))
++		return false;
++	m_key = key;
++	if (!decryptEntries()) {
++		m_key.clear();
++		return false;
++	}
++	m_unlocked = true;
++	return true;
++#else
++	return false;
++#endif
++}
++
++void PasswordVault::lock()
++{
++	m_unlocked = false;
++	m_key.clear();
++	m_entries.clear();
++}
++
++std::optional<std::string> PasswordVault::getPassword(const std::string &host, int port) const
++{
++	if (!m_unlocked)
++		return std::nullopt;
++	auto it = m_entries.find(entryKey(host, port));
++	if (it == m_entries.end())
++		return std::nullopt;
++	return it->second;
++}
++
++bool PasswordVault::setPassword(const std::string &host, int port, const std::string &password)
++{
++#if USE_OPENSSL
++	if (!m_unlocked)
++		return false;
++	m_entries[entryKey(host, port)] = password;
++	return encryptEntries() && save();
++#else
++	return false;
++#endif
++}
++
++bool PasswordVault::removePassword(const std::string &host, int port)
++{
++#if USE_OPENSSL
++	if (!m_unlocked)
++		return false;
++	auto it = m_entries.find(entryKey(host, port));
++	if (it == m_entries.end())
++		return false;
++	m_entries.erase(it);
++	return encryptEntries() && save();
++#else
++	return false;
++#endif
++}
++
++std::vector<std::pair<std::string, int>> PasswordVault::listEntries() const
++{
++	std::vector<std::pair<std::string, int>> out;
++	if (!m_unlocked)
++		return out;
++	for (const auto &[key, _] : m_entries) {
++		auto sep = key.find('\x1f');
++		if (sep == std::string::npos)
++			continue;
++		out.emplace_back(key.substr(0, sep), std::atoi(key.substr(sep + 1).c_str()));
++	}
++	std::sort(out.begin(), out.end());
++	return out;
++}
++
++// AES-256-GCM encryption of the current entries into m_blob.
++bool PasswordVault::encryptEntries()
++{
++#if USE_OPENSSL
++	std::string plaintext = entriesToPlaintext(m_entries);
++	std::string nonce(NONCE_LEN, '\0');
++	if (RAND_bytes((unsigned char *)nonce.data(), NONCE_LEN) != 1)
++		return false;
++
++	std::string cipher(plaintext.size(), '\0');
++	std::string tag(TAG_LEN, '\0');
++
++	EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
++	if (!ctx)
++		return false;
++	int outlen = 0, finlen = 0;
++	bool ok = false;
++	if (EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, NULL, NULL) == 1 &&
++			EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, NONCE_LEN, NULL) == 1 &&
++			EVP_EncryptInit_ex(ctx, NULL, NULL, (const unsigned char *)m_key.data(),
++					(const unsigned char *)nonce.data()) == 1 &&
++			EVP_EncryptUpdate(ctx, (unsigned char *)cipher.data(), &outlen,
++					(const unsigned char *)plaintext.data(), (int)plaintext.size()) == 1 &&
++			EVP_EncryptFinal_ex(ctx, (unsigned char *)cipher.data() + outlen, &finlen) == 1 &&
++			EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, TAG_LEN, tag.data()) == 1)
++		ok = true;
++	EVP_CIPHER_CTX_free(ctx);
++	if (!ok)
++		return false;
++
++	m_blob = nonce + tag + cipher;
++	return true;
++#else
++	return false;
++#endif
++}
++
++bool PasswordVault::decryptEntries()
++{
++#if USE_OPENSSL
++	if (m_blob.size() < NONCE_LEN + TAG_LEN)
++		return false;
++	std::string nonce = m_blob.substr(0, NONCE_LEN);
++	std::string tag = m_blob.substr(NONCE_LEN, TAG_LEN);
++	std::string cipher = m_blob.substr(NONCE_LEN + TAG_LEN);
++
++	std::string plaintext(cipher.size(), '\0');
++	EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
++	if (!ctx)
++		return false;
++	int outlen = 0, finlen = 0;
++	bool ok = false;
++	if (EVP_DecryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, NULL, NULL) == 1 &&
++			EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, NONCE_LEN, NULL) == 1 &&
++			EVP_DecryptInit_ex(ctx, NULL, NULL, (const unsigned char *)m_key.data(),
++					(const unsigned char *)nonce.data()) == 1 &&
++			EVP_DecryptUpdate(ctx, (unsigned char *)plaintext.data(), &outlen,
++					(const unsigned char *)cipher.data(), (int)cipher.size()) == 1 &&
++			EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, TAG_LEN, (void *)tag.data()) == 1 &&
++			EVP_DecryptFinal_ex(ctx, (unsigned char *)plaintext.data() + outlen, &finlen) == 1)
++		ok = true;
++	EVP_CIPHER_CTX_free(ctx);
++	if (!ok)
++		return false;
++	plaintext.resize(outlen + finlen);
++	return plaintextToEntries(plaintext, m_entries);
++#else
++	return false;
++#endif
++}
+diff --git a/src/client/password_vault.h b/src/client/password_vault.h
+new file mode 100644
+index 0000000..a32217f
+--- /dev/null
++++ b/src/client/password_vault.h
+@@ -0,0 +1,67 @@
++// Luanti
++// SPDX-License-Identifier: LGPL-2.1-or-later
++// Client-side password vault for server logins.
++//
++// Stores per-server passwords encrypted at rest behind a single master
++// password (PBKDF2 key derivation + AES-256-GCM). The derived key is held in
++// memory only while unlocked.
++//
++// This is a convenience store, not a hardened password manager: it protects
++// against casual reading of the user's files on a shared/unlocked device, but
++// not against a compromised device or a malicious process.
++
++#pragma once
++
++#include <map>
++#include <optional>
++#include <string>
++#include <utility>
++#include <vector>
++
++class PasswordVault
++{
++public:
++	static PasswordVault &get();
++
++	enum class Status { None, Locked, Unlocked };
++
++	Status status() const;
++
++	// Master password management.
++	bool setMasterPassword(const std::string &master);
++	bool changeMasterPassword(const std::string &old_master,
++			const std::string &new_master);
++	bool removeMasterPassword(const std::string &master);
++	bool unlock(const std::string &master);
++	void lock();
++
++	// Entry access (requires the vault to be unlocked).
++	std::optional<std::string> getPassword(const std::string &host, int port) const;
++	bool setPassword(const std::string &host, int port, const std::string &password);
++	bool removePassword(const std::string &host, int port);
++	std::vector<std::pair<std::string, int>> listEntries() const;
++
++private:
++	PasswordVault();
++
++	bool load();
++	bool save() const;
++	bool deriveKey(const std::string &master, std::string &key_out) const;
++	bool encryptEntries();
++	bool decryptEntries();
++
++	// Decrypted entries: "host\x1fport" -> password.
++	std::map<std::string, std::string> m_entries;
++
++	// Persistent metadata.
++	std::string m_salt;
++	int m_iterations = 0;
++	std::string m_verifier;
++	std::string m_blob; // encrypted entries (nonce||tag||cipher)
++
++	bool m_has_master = false;
++	bool m_unlocked = false;
++	std::string m_key; // 32 bytes, only valid while unlocked
++
++	std::string m_path;
++};
 diff --git a/src/client/renderingengine.cpp b/src/client/renderingengine.cpp
 index ccc4452..3bce263 100644
 --- a/src/client/renderingengine.cpp
@@ -6395,6 +7249,163 @@ index 812d530..b2858b4 100644
  	// Load bit library
  	lua_pushcfunction(m_luastack, luaopen_bit);
  	lua_pushstring(m_luastack, LUA_BITLIBNAME);
+diff --git a/src/script/lua_api/l_mainmenu.cpp b/src/script/lua_api/l_mainmenu.cpp
+index ef6de61..7318b5a 100644
+--- a/src/script/lua_api/l_mainmenu.cpp
++++ b/src/script/lua_api/l_mainmenu.cpp
+@@ -21,6 +21,7 @@
+ #include "client/client.h"
+ #include "client/renderingengine.h"
+ #include "client/texturepaths.h"
++#include "client/password_vault.h"
+ #include "network/networkprotocol.h"
+ #include "content/mod_configuration.h"
+ #include "common/c_converter.h"
+@@ -1137,6 +1138,104 @@ int ModApiMainMenu::l_copy_to_clipboard(lua_State *L)
+ 	return 0;
+ }
+ 
++// Password vault
++
++static PasswordVault &pwvault()
++{
++	return PasswordVault::get();
++}
++
++int ModApiMainMenu::l_pwvault_status(lua_State *L)
++{
++	switch (pwvault().status()) {
++	case PasswordVault::Status::Unlocked: lua_pushliteral(L, "unlocked"); break;
++	case PasswordVault::Status::Locked:   lua_pushliteral(L, "locked"); break;
++	case PasswordVault::Status::None:     lua_pushliteral(L, "none"); break;
++	}
++	return 1;
++}
++
++int ModApiMainMenu::l_pwvault_set_master(lua_State *L)
++{
++	const char *master = luaL_checkstring(L, 1);
++	lua_pushboolean(L, pwvault().setMasterPassword(master));
++	return 1;
++}
++
++int ModApiMainMenu::l_pwvault_change_master(lua_State *L)
++{
++	const char *old_master = luaL_checkstring(L, 1);
++	const char *new_master = luaL_checkstring(L, 2);
++	lua_pushboolean(L, pwvault().changeMasterPassword(old_master, new_master));
++	return 1;
++}
++
++int ModApiMainMenu::l_pwvault_remove_master(lua_State *L)
++{
++	const char *master = luaL_checkstring(L, 1);
++	lua_pushboolean(L, pwvault().removeMasterPassword(master));
++	return 1;
++}
++
++int ModApiMainMenu::l_pwvault_unlock(lua_State *L)
++{
++	const char *master = luaL_checkstring(L, 1);
++	lua_pushboolean(L, pwvault().unlock(master));
++	return 1;
++}
++
++int ModApiMainMenu::l_pwvault_lock(lua_State *L)
++{
++	pwvault().lock();
++	return 0;
++}
++
++int ModApiMainMenu::l_pwvault_get(lua_State *L)
++{
++	const char *host = luaL_checkstring(L, 1);
++	int port = (int)luaL_checkinteger(L, 2);
++	auto password = pwvault().getPassword(host, port);
++	if (password) {
++		lua_pushlstring(L, password->c_str(), password->size());
++	} else {
++		lua_pushnil(L);
++	}
++	return 1;
++}
++
++int ModApiMainMenu::l_pwvault_put(lua_State *L)
++{
++	const char *host = luaL_checkstring(L, 1);
++	int port = (int)luaL_checkinteger(L, 2);
++	const char *password = luaL_checkstring(L, 3);
++	lua_pushboolean(L, pwvault().setPassword(host, port, password));
++	return 1;
++}
++
++int ModApiMainMenu::l_pwvault_remove(lua_State *L)
++{
++	const char *host = luaL_checkstring(L, 1);
++	int port = (int)luaL_checkinteger(L, 2);
++	lua_pushboolean(L, pwvault().removePassword(host, port));
++	return 1;
++}
++
++int ModApiMainMenu::l_pwvault_list(lua_State *L)
++{
++	auto entries = pwvault().listEntries();
++	lua_createtable(L, entries.size(), 0);
++	int i = 1;
++	for (const auto &[host, port] : entries) {
++		lua_createtable(L, 0, 2);
++		lua_pushstring(L, host.c_str());
++		lua_setfield(L, -2, "host");
++		lua_pushinteger(L, port);
++		lua_setfield(L, -2, "port");
++		lua_rawseti(L, -2, i++);
++	}
++	return 1;
++}
++
+ /******************************************************************************/
+ void ModApiMainMenu::Initialize(lua_State *L, int top)
+ {
+@@ -1193,6 +1292,16 @@ void ModApiMainMenu::Initialize(lua_State *L, int top)
+ 	API_FCT(share_file);
+ 	API_FCT(do_async_callback);
+ 	API_FCT(copy_to_clipboard);
++	API_FCT(pwvault_status);
++	API_FCT(pwvault_set_master);
++	API_FCT(pwvault_change_master);
++	API_FCT(pwvault_remove_master);
++	API_FCT(pwvault_unlock);
++	API_FCT(pwvault_lock);
++	API_FCT(pwvault_get);
++	API_FCT(pwvault_put);
++	API_FCT(pwvault_remove);
++	API_FCT(pwvault_list);
+ 
+ 	lua_pushboolean(L, g_first_run);
+ 	lua_setfield(L, top, "is_first_run");
+diff --git a/src/script/lua_api/l_mainmenu.h b/src/script/lua_api/l_mainmenu.h
+index 94925c1..6027b85 100644
+--- a/src/script/lua_api/l_mainmenu.h
++++ b/src/script/lua_api/l_mainmenu.h
+@@ -154,6 +154,18 @@ class ModApiMainMenu: public ModApiBase
+ 	// clipboard
+ 	static int l_copy_to_clipboard(lua_State *L);
+ 
++	// password vault
++	static int l_pwvault_status(lua_State *L);
++	static int l_pwvault_set_master(lua_State *L);
++	static int l_pwvault_change_master(lua_State *L);
++	static int l_pwvault_remove_master(lua_State *L);
++	static int l_pwvault_unlock(lua_State *L);
++	static int l_pwvault_lock(lua_State *L);
++	static int l_pwvault_get(lua_State *L);
++	static int l_pwvault_put(lua_State *L);
++	static int l_pwvault_remove(lua_State *L);
++	static int l_pwvault_list(lua_State *L);
++
+ public:
+ 
+ 	/**
 diff --git a/util/ios/install_resources.cmake b/util/ios/install_resources.cmake
 new file mode 100644
 index 0000000..750c4a3
