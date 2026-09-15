@@ -23,7 +23,7 @@ for the Lua engine embedded in the client:
 | | `luanti-ios-lua.ipa` | `luanti-ios-luajit.ipa` |
 |---|---|---|
 | Lua engine | bundled PUC Lua 5.1 | LuaJIT 2.1 |
-| Compatibility | runs everywhere | runs everywhere |
+| Compatibility | runs everywhere | newer hardware recommended |
 | Speed | baseline | usually **~2–4× faster** Lua |
 | Best for | simplest / maximum compatibility | heavier mods and games |
 
