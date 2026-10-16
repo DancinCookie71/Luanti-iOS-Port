@@ -63,7 +63,7 @@ Grab either build from the **Actions** tab of the newest successful run:
 The `.ipa` is **unsigned**. Sign it with whatever you already use:
 
 - **TrollStore** — installs unsigned apps directly (specific iOS versions)
-- **ESign / Feather** — on-device signers
+- **KSign / Feather** — on-device signers (Please do not use ESign or Scarlet!)
 - **AltStore / Sideloadly** — sign locally with any (even free) Apple ID; note
   the 7-day expiry with a free account
 
